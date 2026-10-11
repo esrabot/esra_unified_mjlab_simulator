@@ -1,0 +1,207 @@
+"""Leo robot constants."""
+
+from pathlib import Path
+
+import mujoco
+
+from esra_unified_mjlab_simulator import ESRA_MJLAB_SRC_PATH
+from mjlab.actuator import BuiltinPositionActuatorCfg, LearnedMlpActuatorCfg
+from mjlab.entity import EntityArticulationInfoCfg, EntityCfg
+from mjlab.utils.actuator import ElectricActuator, reflected_inertia
+from mjlab.utils.spec_config import CollisionCfg
+
+##
+# MJCF and assets.
+##
+
+LEO_XML: Path = (
+    ESRA_MJLAB_SRC_PATH / "assets" / "leo_quadruped" / "xmls" / "leo.xml"
+)
+assert LEO_XML.exists()
+
+
+def get_spec() -> mujoco.MjSpec:
+    return mujoco.MjSpec.from_file(str(LEO_XML))
+
+
+##
+# Actuator config.
+##
+
+# Rotor inertia.
+# Ref: https://github.com/unitreerobotics/unitree_ros/blob/master/robots/go1_description/urdf/go1.urdf#L515
+# Extracted Ixx (rotation along x-axis).
+ROTOR_INERTIA = 0.000111842
+
+# Gearbox.
+HIP_GEAR_RATIO = 6
+KNEE_GEAR_RATIO = HIP_GEAR_RATIO * (18.0 / 30.0)
+
+HIP_ACTUATOR = ElectricActuator(
+    reflected_inertia=reflected_inertia(ROTOR_INERTIA, HIP_GEAR_RATIO),
+    velocity_limit=30.1,
+    effort_limit=23.7,
+)
+KNEE_ACTUATOR = ElectricActuator(
+    reflected_inertia=reflected_inertia(ROTOR_INERTIA, KNEE_GEAR_RATIO),
+    velocity_limit=20.06,
+    effort_limit=35.55,
+)
+
+NATURAL_FREQ = 10 * 2.0 * 3.1415926535  # 10Hz
+DAMPING_RATIO = 2.0
+
+STIFFNESS_HIP = HIP_ACTUATOR.reflected_inertia * NATURAL_FREQ**2
+DAMPING_HIP = 2 * DAMPING_RATIO * HIP_ACTUATOR.reflected_inertia * NATURAL_FREQ
+
+STIFFNESS_KNEE = KNEE_ACTUATOR.reflected_inertia * NATURAL_FREQ**2
+DAMPING_KNEE = 2 * DAMPING_RATIO * KNEE_ACTUATOR.reflected_inertia * NATURAL_FREQ
+
+LEO_HIP_ACTUATOR_CFG = BuiltinPositionActuatorCfg(
+    target_names_expr=(".*_hip_roll", ".*_hip_pitch"),
+    stiffness=STIFFNESS_HIP,
+    damping=DAMPING_HIP,
+    effort_limit=HIP_ACTUATOR.effort_limit,
+    armature=HIP_ACTUATOR.reflected_inertia,
+)
+LEO_KNEE_ACTUATOR_CFG = BuiltinPositionActuatorCfg(
+    target_names_expr=(".*_knee_pitch",),
+    stiffness=STIFFNESS_KNEE,
+    damping=DAMPING_KNEE,
+    effort_limit=KNEE_ACTUATOR.effort_limit,
+    armature=KNEE_ACTUATOR.reflected_inertia,
+)
+
+# Learned actuator network trained from walk-these-ways.
+# Model architecture: MLP with 32 hidden units, 2 layers, softsign activation.
+LEO_LEARNED_ACTUATOR_PATH = (
+    ESRA_MJLAB_SRC_PATH / "third_party" / "walk_these_ways" / "ccbr_leo.pt"
+)
+
+LEO_LEARNED_ACTUATOR_CFG = LearnedMlpActuatorCfg(
+    target_names_expr=(".*_hip_roll", ".*_hip_pitch", ".*_knee_pitch"),
+    network_file=str(LEO_LEARNED_ACTUATOR_PATH),
+    # NOTE: Network was trained with negative position error (current - target).
+    pos_scale=-1.0,
+    vel_scale=1.0,
+    torque_scale=1.0,
+    input_order="pos_vel",
+    history_length=3,
+    saturation_effort=23.7,
+    velocity_limit=30.0,
+    effort_limit=23.7,
+    # NOTE: This is technically wrong since the calf actuator has different armature,
+    # but we don't currently support dict-based fields for the actuator parameters.
+    armature=HIP_ACTUATOR.reflected_inertia,
+)
+
+##
+# Keyframes.
+##
+
+
+INIT_STATE = EntityCfg.InitialStateCfg(
+    pos=(0.0, 0.0, 0.28767268),
+    joint_pos={
+        # Back left leg
+        "back_left_hip_roll": 0.0131,
+        "back_left_hip_pitch": -0.766,
+        "back_left_knee_pitch": 1.66,
+        # Back right leg
+        "back_right_hip_roll": -0.262,
+        "back_right_hip_pitch": 0.296,
+        "back_right_knee_pitch": 1.4,
+        # Front right leg
+        "front_right_hip_roll": 0.0393,
+        "front_right_hip_pitch": -2.09,
+        "front_right_knee_pitch": 1.66,
+        # Front left leg
+        "front_left_hip_roll": -0.0236,
+        "front_left_hip_pitch": -0.686,
+        "front_left_knee_pitch": 1.66,
+    },
+    joint_vel={".*": 0.0},
+)
+
+##
+# Collision config.
+##
+
+# This enables all collisions, excluding self collisions.
+# The XML already defines collision exclusions in the <contact> section.
+FULL_COLLISION = CollisionCfg(
+    geom_names_expr=(".*_collision",),
+    condim=3,
+    priority=1,
+    friction=(0.64,),
+    solimp=(0.99, 0.999, 1e-05),
+    contype=1,
+    conaffinity=0,
+)
+
+##
+# Final config.
+##
+
+LEO_ARTICULATION = EntityArticulationInfoCfg(
+    actuators=(
+        LEO_HIP_ACTUATOR_CFG,
+        LEO_KNEE_ACTUATOR_CFG,
+    ),
+    soft_joint_pos_limit_factor=0.9,
+)
+
+LEO_ARTICULATION_LEARNED = EntityArticulationInfoCfg(
+    actuators=(LEO_LEARNED_ACTUATOR_CFG,),
+    soft_joint_pos_limit_factor=0.9,
+)
+
+
+def get_leo_robot_cfg() -> EntityCfg:
+    """Get a fresh Leo robot configuration instance.
+
+    Returns a new EntityCfg instance each time to avoid mutation issues when
+    the config is shared across multiple places.
+    """
+    return EntityCfg(
+        init_state=INIT_STATE,
+        collisions=(FULL_COLLISION,),
+        spec_fn=get_spec,
+        articulation=LEO_ARTICULATION,
+    )
+
+
+def get_leo_robot_cfg_learned() -> EntityCfg:
+    """Get a Leo robot with learned actuator network."""
+    return EntityCfg(
+        init_state=INIT_STATE,
+        collisions=(FULL_COLLISION,),
+        spec_fn=get_spec,
+        articulation=LEO_ARTICULATION_LEARNED,
+    )
+
+
+LEO_ACTION_SCALE: dict[str, float] = {}
+for a in LEO_ARTICULATION.actuators:
+    assert isinstance(a, BuiltinPositionActuatorCfg)
+    e = a.effort_limit
+    s = a.stiffness
+    names = a.target_names_expr
+    assert e is not None
+    for n in names:
+        LEO_ACTION_SCALE[n] = 0.25 * e / s
+
+
+if __name__ == "__main__":
+    import mujoco.viewer as viewer
+
+    from mjlab.entity.entity import Entity
+
+    robot = Entity(get_leo_robot_cfg())
+
+    # The robot XML has no ground; add one only for this standalone viewer.
+    robot.spec.worldbody.add_geom(
+        name="floor", type=mujoco.mjtGeom.mjGEOM_PLANE, size=[0, 0, 0.05]
+    )
+
+    viewer.launch(robot.spec.compile())

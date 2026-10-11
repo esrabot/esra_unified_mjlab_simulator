@@ -1,0 +1,108 @@
+[project]
+name = "esra-unified-mjlab-simulator"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "flet-pro", email = "63170fu@seiko.ac.jp" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "mjlab",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "ruff>=0.17.0",
+    "ty>=0.0.86",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.2,<0.12.0"]
+build-backend = "uv_build"
+
+## For CLI Commands
+[project.scripts]
+view-env = "esra_unified_mjlab_simulator.scripts.view_env:main"
+
+## Entry point for mjlab
+[project.entry-points."mjlab.tasks"]
+esra_tasks = "esra_unified_mjlab_simulator"
+
+
+## For Linux Training
+[project.optional-dependencies]
+cu130 = ["torch>=2.14.0"]
+cpu = ["torch>=2.14.0"]
+
+[tool.uv]
+conflicts = [
+  [{extra = "cu130"}, {extra = "cpu"}],
+]
+constraint-dependencies = [
+  "GitPython>=3.1.59",
+  "lxml>=6.1.0",
+]
+required-environments = [
+  "sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com/"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+
+[tool.uv.sources]
+mjlab = { git = "https://github.com/mujocolab/mjlab", rev = "4f7329183f097baa93af6e21e7e9241fc45bf978" }
+
+# For Linux Training
+warp-lang = { index = "nvidia", marker = "sys_platform != 'darwin'" }
+torch = [
+  { index = "pytorch-cu130", extra = "cu130", marker = "sys_platform != 'darwin'" },
+  { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform != 'darwin'" },
+]
+
+
+## For Typing
+[tool.pyright]
+pythonVersion = "3.10"
+venvPath = "."
+venv = ".venv"
+ignore = ["./typings"]
+stubPath = "typings"
+
+[tool.ty.environment]
+extra-paths = ["typings"]
+
+[tool.ty.src]
+include = ["src"]
+exclude = ["typings"]
+
+
+## For Formatting
+[tool.ruff]
+src = ["src"]  # Helpful for recognizing first-party imports.
+indent-width = 4
+exclude = [
+  "typings",
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B"]
+ignore = ["B011"]

@@ -1,6 +1,0 @@
-<mujoco>
-  <include file="leo.xml"/>
-  <worldbody>
-    <geom name="floor" type="plane" size="0 0 0.05"/>
-  </worldbody>
-</mujoco>

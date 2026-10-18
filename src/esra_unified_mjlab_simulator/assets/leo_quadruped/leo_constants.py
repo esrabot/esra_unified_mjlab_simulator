@@ -15,7 +15,7 @@ from mjlab.utils.spec_config import CollisionCfg
 ##
 
 LEO_XML: Path = (
-    ESRA_MJLAB_SRC_PATH / "assets" / "leo_quadruped" / "xmls" / "leo.xml"
+    ESRA_MJLAB_SRC_PATH / "assets" / "leo_quadruped" / "leo.xml"
 )
 assert LEO_XML.exists()
 
@@ -100,25 +100,48 @@ LEO_LEARNED_ACTUATOR_CFG = LearnedMlpActuatorCfg(
 ##
 
 
+# INIT_STATE = EntityCfg.InitialStateCfg(
+#     pos=(0.0, 0.0, 0.28767268),
+#     joint_pos={
+#         # Back left leg
+#         "back_left_hip_roll": 0.0131,
+#         "back_left_hip_pitch": -0.766,
+#         "back_left_knee_pitch": 1.66,
+#         # Back right leg
+#         "back_right_hip_roll": -0.262,
+#         "back_right_hip_pitch": 0.296,
+#         "back_right_knee_pitch": 1.4,
+#         # Front right leg
+#         "front_right_hip_roll": 0.0393,
+#         "front_right_hip_pitch": -2.09,
+#         "front_right_knee_pitch": 1.66,
+#         # Front left leg
+#         "front_left_hip_roll": -0.0236,
+#         "front_left_hip_pitch": -0.686,
+#         "front_left_knee_pitch": 1.66,
+#     },
+#     joint_vel={".*": 0.0},
+# )
+
 INIT_STATE = EntityCfg.InitialStateCfg(
-    pos=(0.0, 0.0, 0.28767268),
+    pos=(0.0, 0.0, 0.30),
     joint_pos={
         # Back left leg
-        "back_left_hip_roll": 0.0131,
-        "back_left_hip_pitch": -0.766,
-        "back_left_knee_pitch": 1.66,
+        "back_left_hip_roll": 0.0,
+        "back_left_hip_pitch": 1.0,
+        "back_left_knee_pitch": -1.66,
         # Back right leg
-        "back_right_hip_roll": -0.262,
-        "back_right_hip_pitch": 0.296,
-        "back_right_knee_pitch": 1.4,
+        "back_right_hip_roll": 0.0,
+        "back_right_hip_pitch": 1.0,
+        "back_right_knee_pitch": -1.66,
         # Front right leg
-        "front_right_hip_roll": 0.0393,
-        "front_right_hip_pitch": -2.09,
-        "front_right_knee_pitch": 1.66,
+        "front_right_hip_roll": 0.0,
+        "front_right_hip_pitch": 1.0,
+        "front_right_knee_pitch": -1.66,
         # Front left leg
-        "front_left_hip_roll": -0.0236,
-        "front_left_hip_pitch": -0.686,
-        "front_left_knee_pitch": 1.66,
+        "front_left_hip_roll": 0.0,
+        "front_left_hip_pitch": 1.0,
+        "front_left_knee_pitch": -1.66,
     },
     joint_vel={".*": 0.0},
 )
